@@ -25,8 +25,22 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from vfc import video
+from vfc import cipher
 from vfc.fingerprint import fingerprint_from_gray
 from vfc.stego import WavAudio
+
+
+def spec_cipher_bullet() -> str:
+    """Cipher bullet for the Info/Spec tab.
+
+    Built from cipher.ROUNDS (single source of truth) so the displayed
+    round count can never drift from the implementation again.
+    Regression gate: vfc/tests.py::test_gui_rounds_match.
+    """
+    return (
+        "  • SPN Block Cipher: 128-bit custom block cipher with SubBytes (GF(2^8) S-box), "
+        f"ShiftRows, MixColumns (invertible MDS matrix in GF(2^8)), and AddRoundKey across {cipher.ROUNDS} rounds.\n"
+    )
 
 
 def open_in_file_manager(path: str):
@@ -978,7 +992,7 @@ class VfcGuiApp(tk.Tk):
             "Key Architectural Components:\n"
             "  • Frame Fingerprint: Extracts a 64-bit perceptual hash (aHash) from a chosen grayscale video frame.\n"
             "  • Key Derivation (PBKDF2-HMAC-SHA256): Derives K_embed (embedding key), K_enc (cipher key), and K_auth (HMAC key) using password + frame aHash + frame number + salt.\n"
-            "  • SPN Block Cipher: 128-bit custom block cipher with SubBytes (GF(2^8) S-box), ShiftRows, MixColumns (invertible MDS matrix in GF(2^8)), and AddRoundKey across 10 rounds.\n"
+            + spec_cipher_bullet() +
             "  • CBC Mode + PKCS#7: Symmetric ciphertext chaining with random IV.\n"
             "  • Authenticated Payload: Encrypt-then-MAC with HMAC-SHA256 and key-derived magic header to prevent password-oracle leakage.\n"
             "  • Steganography: Silence-safe LSB replacement in 16-bit PCM audio with CSPRNG Fisher-Yates shuffled positions.\n"
@@ -1580,9 +1594,9 @@ class VfcGuiApp(tk.Tk):
                     "-c:a", "pcm_s16le",
                     out_video
                 ]
-                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                if res.returncode != 0:
-                    raise RuntimeError(res.stderr or "ffmpeg conversion failed.")
+                # Single ffmpeg runner: preflights the binary and keeps
+                # stderr on failure (vfc/video.py).
+                video._run(cmd)
 
                 def _on_success():
                     self.btn_convert_carrier.configure(state="normal")
@@ -1628,7 +1642,9 @@ class VfcGuiApp(tk.Tk):
                 with tempfile.TemporaryDirectory() as tmp:
                     wav_path = os.path.join(tmp, "carrier.wav")
                     cmd = ["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le", wav_path]
-                    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    # Single ffmpeg runner: preflights the binary and keeps
+                    # stderr on failure instead of swallowing it (vfc/video.py).
+                    video._run(cmd)
 
                     audio = WavAudio.load(wav_path)
                     eligible = audio.eligible_indices()
