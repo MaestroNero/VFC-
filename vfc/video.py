@@ -13,6 +13,7 @@ uncompressed PCM (in an MKV container) so the LSB payload survives.
 """
 
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -20,9 +21,49 @@ from .stego import WavAudio
 from . import core
 
 
+class FFmpegError(RuntimeError):
+    """Missing ffmpeg binary or a failed ffmpeg invocation.
+
+    Subclasses RuntimeError so existing `except RuntimeError` handlers
+    (e.g. CLI decrypt) keep working with clearer messages.
+    """
+
+
+def require_ffmpeg() -> str:
+    """Return the ffmpeg executable path, or raise a helpful error.
+
+    Single preflight helper so every video path fails fast with an
+    actionable message instead of a bare subprocess failure.
+    """
+    path = shutil.which("ffmpeg")
+    if not path:
+        raise FFmpegError(
+            "ffmpeg is required but was not found in PATH. "
+            "Please install ffmpeg and try again."
+        )
+    return path
+
+
 def _run(cmd):
-    subprocess.run(cmd, check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    require_ffmpeg()
+    try:
+        proc = subprocess.run(cmd, check=False,
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.PIPE, text=True)
+    except FileNotFoundError:
+        raise FFmpegError(
+            "ffmpeg is required but was not found in PATH. "
+            "Please install ffmpeg and try again."
+        )
+    if proc.returncode != 0:
+        detail = (proc.stderr or "").strip()
+        if len(detail) > 2000:
+            detail = detail[-2000:]
+        raise FFmpegError(
+            f"ffmpeg failed with exit code {proc.returncode}: {detail}"
+            if detail else
+            f"ffmpeg failed with exit code {proc.returncode}."
+        )
 
 
 def extract_frame_gray(video_path: str, frame_no: int):

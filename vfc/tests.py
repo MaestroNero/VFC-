@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VFC test suite — 13 checks (spec section 8, v0.2).
+VFC test suite — 14 checks (spec section 8, v0.2).
 
 Run:
     python3 vfc/tests.py          # from the repo root
@@ -8,8 +8,9 @@ Run:
 
 Covers:
     MixColumns invertibility, S-Box bijectivity, block roundtrip,
-    avalanche, cross-byte diffusion, spec tests A-G, and LSB
-    steganalysis (payload bit uniformity).
+    avalanche, cross-byte diffusion, spec tests A-G, LSB
+    steganalysis (payload bit uniformity), and the GUI round-count
+    regression gate (CRY-007).
 """
 
 import os
@@ -219,6 +220,31 @@ def test_doc_appendix_vectors_sanity():
     return decrypt_block(encrypt_block(block, rk), rk) == block
 
 
+def test_gui_rounds_match():
+    """GUI Spec-tab round count equals cipher.ROUNDS (CRY-007 gate).
+
+    Strong path (tkinter/cv2 installed): render the exact bullet the Info
+    tab displays and require the ONLY '<N> rounds' figure in it to be the
+    live constant — a stale hardcoded count fails the set comparison.
+    Fallback path (GUI deps missing): require vfc/gui.py to reference
+    cipher.ROUNDS in the bullet builder and to contain no '<N> rounds'
+    literal at all. Either path fails if the text drifts from the constant.
+    """
+    import re
+
+    from vfc.cipher import ROUNDS as live_rounds
+    try:
+        from vfc.gui import spec_cipher_bullet
+    except ImportError:
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "gui.py"), encoding="utf-8").read()
+        return ("cipher.ROUNDS" in src
+                and "spec_cipher_bullet" in src
+                and not re.findall(r"(\d+)\s+rounds", src))
+    bullet = spec_cipher_bullet()
+    return set(re.findall(r"(\d+)\s+rounds", bullet)) == {str(live_rounds)}
+
+
 CHECKS = [
     ("MixColumns invertible (INV x M = I)", test_mixcolumns_invertible),
     ("S-Box bijective + correct inverse", test_sbox_bijective),
@@ -233,6 +259,7 @@ CHECKS = [
     ("Test F - single bit flip rejected", test_f_single_bit_flip),
     ("Test G - audio quality (SNR > 80 dB)", test_g_audio_quality),
     ("Steganalysis - hidden LSBs uniform (chi²)", test_lsb_uniformity),
+    ("GUI round count matches cipher.ROUNDS", test_gui_rounds_match),
 ]
 
 

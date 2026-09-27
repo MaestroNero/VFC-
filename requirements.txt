@@ -1,0 +1,18 @@
+# VFC runtime dependencies — verified from actual imports + subprocess calls.
+#
+# Direct Python dependency (only one):
+#   - vfc/video.py, vfc/gui.py, vfc/vfc_cli.py import cv2 (OpenCV) for frame
+#     extraction / preview. The stdlib core (cipher/keys/fingerprint/payload/
+#     prng/stego/core) needs no third-party package.
+#   - numpy is NOT imported directly; it arrives transitively via OpenCV.
+#   - The `cryptography` package is NOT used; KDF/HMAC rely on stdlib
+#     hashlib/hmac (see vfc/keys.py).
+#
+# System requirement (not installable via pip):
+#   - ffmpeg binary on PATH — required for all real-video operations
+#     (audio demux to pcm_s16le WAV, remux with -c:v copy). See README.
+#   - Tkinter ships with most CPython installs; on minimal Debian/Ubuntu:
+#       sudo apt install ffmpeg python3-tk
+#
+# Verified working set in audit: opencv-python-headless 5.0.0.93, Python 3.13.
+opencv-python-headless>=4.8.0

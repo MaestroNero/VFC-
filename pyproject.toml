@@ -1,0 +1,24 @@
+# Minimal project metadata for VFC v0.2 (educational).
+#
+# Role: single source for name/version/python-floor/dependencies so tools
+# (pip, editors, future CI) agree with requirements.txt. No build customization,
+# no entry points, no test config yet — the project still runs as
+# `python3 vfc/vfc_cli.py` / `python3 vfc_gui.py` / `python3 vfc/tests.py`.
+# pytest config lands in Phase B together with the tests/ migration.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vfc"
+version = "0.2.0"
+description = "Video Frame Cipher — educational video steganography (frame-bound keys, SPN demo cipher, audio LSB)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python-headless>=4.8.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vfc*"]
